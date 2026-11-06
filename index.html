@@ -18,6 +18,7 @@
     --r:16px;
   }
   *{box-sizing:border-box}
+  [hidden]{display:none!important}
   html,body{margin:0;background:var(--bg);color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     -webkit-font-smoothing:antialiased}
@@ -121,10 +122,31 @@
   .sync-pill.ok{color:var(--green)} .sync-pill.err{color:var(--amber)}
   .steps{padding-left:20px;margin:0 0 12px} .steps li{margin:5px 0}
   a{color:var(--blue)}
+  .lock{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;z-index:50;padding:24px}
+  .lock-box{width:min(360px,100%);text-align:center}
+  .lock-box .logo{font-size:52px}
+  .lock-box h2{margin:6px 0 6px;font-size:24px}
+  .lock-box input{width:100%;margin-bottom:10px;font-size:17px;padding:14px}
+  .lock-box .help{color:var(--muted);font-size:14px;margin:0 0 18px;line-height:1.45}
   footer{color:var(--muted);font-size:12px;text-align:center;margin-top:10px}
 </style>
 </head>
 <body>
+<div class="lock" id="lock" hidden>
+  <div class="lock-box">
+    <div class="logo">💸</div>
+    <h2>Mi Plata</h2>
+    <p class="help" id="lockMsg">Cargando…</p>
+    <form id="lockForm" autocomplete="on">
+      <input type="text" name="username" value="mi-plata" autocomplete="username" hidden>
+      <input type="password" id="pass1" placeholder="Contraseña" autocomplete="current-password" aria-label="Contraseña">
+      <input type="password" id="pass2" placeholder="Repetí la contraseña" autocomplete="new-password" aria-label="Repetí la contraseña" hidden>
+      <div class="err" id="lockErr"></div>
+      <button class="primary neutral" id="lockBtn">Entrar</button>
+    </form>
+  </div>
+</div>
+
 <div class="wrap">
   <header>
     <h1>💸 Mi Plata</h1>
@@ -208,31 +230,7 @@
     <h3>Configuración</h3>
     <div class="welcome" id="welcome" hidden>
       👋 ¡Bienvenido! Primero cargá <b>cuánto ganás por día</b> y <b>qué días trabajás</b>.
-      La app va sumando sola tu jornada cada día que trabajás. Después solo cargás los gastos y los extras.<br><br>
-      ¿Ya la usás en otro dispositivo? Conectá la <b>sincronización</b> acá abajo y se bajan tus datos.
-    </div>
-
-    <h4>Sincronización (celular ↔ Mac)</h4>
-    <div id="syncOff">
-      <p class="help">Tus datos se guardan en un repositorio <b>privado</b> de tu GitHub, aparte de la página.
-        Hacelo una vez en cada dispositivo:</p>
-      <ol class="help steps">
-        <li>Abrí <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">crear un token en GitHub</a>.</li>
-        <li>Poné un nombre (ej. "Mi Plata celular") y la <b>expiración más larga</b> que te deje.</li>
-        <li>En <b>Repository access</b> elegí <b>Only select repositories</b> → <b>mi-plata-datos</b>.</li>
-        <li>En <b>Permissions → Repository permissions → Contents</b> elegí <b>Read and write</b>.</li>
-        <li>Tocá <b>Generate token</b>, copialo, pegalo acá y tocá Conectar.</li>
-      </ol>
-      <div class="row"><input id="syncOwner" placeholder="Usuario de GitHub" aria-label="Usuario de GitHub"><input id="syncRepo" placeholder="Repositorio de datos" aria-label="Repositorio de datos"></div>
-      <div class="row"><input type="password" id="syncToken" placeholder="Token (github_pat_…)" aria-label="Token" autocomplete="off"><button class="btn" id="syncConnect" type="button">Conectar</button></div>
-      <div class="err" id="syncErr"></div>
-    </div>
-    <div id="syncOn" hidden>
-      <p class="help">✓ Conectado a <b id="syncWhere"></b>. Lo que cargues acá aparece en tus otros dispositivos.</p>
-      <div class="flex">
-        <button class="btn" id="syncNow" type="button">↻ Sincronizar ahora</button>
-        <button class="btn danger" id="syncDisconnect" type="button">Desconectar este dispositivo</button>
-      </div>
+      La app va sumando sola tu jornada cada día que trabajás. Después solo cargás los gastos y los extras.
     </div>
 
     <h4>Ganancia por día</h4>
@@ -254,6 +252,15 @@
       <button class="btn" id="saveInitial" type="button">Guardar</button>
     </div>
 
+    <h4>Contraseña</h4>
+    <p class="help">Es la misma en el celular y en la Mac.</p>
+    <div class="row"><input type="password" id="oldPass" placeholder="Actual" aria-label="Contraseña actual" autocomplete="current-password"><input type="password" id="newPass" placeholder="Nueva (mín. 6)" aria-label="Contraseña nueva" autocomplete="new-password"></div>
+    <div class="err" id="passErr"></div>
+    <div class="flex">
+      <button class="btn" id="changePass" type="button">Cambiar contraseña</button>
+      <button class="btn danger" id="logout" type="button">Salir en este dispositivo</button>
+    </div>
+
     <h4>Copia de seguridad</h4>
     <div class="flex">
       <button class="btn" id="exportBtn" type="button">⬇️ Exportar</button>
@@ -266,8 +273,11 @@
 
 <script>
 const KEY = 'miPlata.v1';
-const SYNC_KEY = 'miPlata.sync';
-const DEFAULT_SYNC = { owner: 'packoeste', repo: 'mi-plata-datos' };
+const SESSION_KEY = 'miPlata.sesion';
+// Base de datos propia de Mi Plata (proyecto Supabase aparte). La clave pública no da acceso a nada sin la contraseña.
+const API = 'https://zplpfhfuwrmuknkamzce.supabase.co/rest/v1/rpc/';
+const API_KEY = 'sb_publishable_joxTUJ2iSpDpdiGGz8O7ng_caHEm8N2';
+localStorage.removeItem('miPlata.sync');
 const CATS = {
   gasto: [
     {id:'comida', name:'Comida', icon:'🍔'},
@@ -454,9 +464,7 @@ function render(){
   $('#toggleToday').hidden = !rateFor(t);
   $('#toggleToday').textContent = w ? 'Hoy no trabajé' : 'Hoy trabajé';
 
-  $('#footer').textContent = syncCfg
-    ? 'Tus datos se sincronizan con tu repositorio privado de GitHub.'
-    : 'Los datos se guardan solo en este dispositivo. Conectá la sincronización en ⚙️ para verlos en el celular y en la Mac.';
+  $('#footer').textContent = 'Tus datos se ven igual en el celular y en la Mac.';
 
   renderMonth();
 }
@@ -529,74 +537,103 @@ $('#toggleToday').onclick = () => toggleDay(today());
 $('#prevM').onclick = () => { viewMonth = shiftMonth(viewMonth,-1); renderMonth(); };
 $('#nextM').onclick = () => { viewMonth = shiftMonth(viewMonth, 1); renderMonth(); };
 
-/* ---------- sincronización con un repo privado de GitHub ---------- */
-let syncCfg = null;
-try { syncCfg = JSON.parse(localStorage.getItem(SYNC_KEY)); } catch(e){}
-let remoteSha = null, syncing = false, again = false, pushTimer = null;
+/* ---------- contraseña y sincronización ---------- */
+let token = localStorage.getItem(SESSION_KEY);
+let remoteVersion = 0, syncing = false, again = false, pushTimer = null;
 
-const ghHeaders = token => ({ Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' });
-const ghUrl = (c, path) => `https://api.github.com/repos/${encodeURIComponent(c.owner)}/${encodeURIComponent(c.repo)}/${path}`;
-const b64enc = str => { const by = new TextEncoder().encode(str); let bin = ''; for (let i = 0; i < by.length; i += 0x8000) bin += String.fromCharCode(...by.subarray(i, i + 0x8000)); return btoa(bin); };
-const b64dec = b64 => new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/\s/g,'')), c => c.charCodeAt(0)));
-class SyncError extends Error { constructor(status){ super('HTTP ' + status); this.status = status; } }
+async function rpc(fn, args){
+  const r = await fetch(API + fn, { method: 'POST', cache: 'no-store',
+    headers: { apikey: API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(args || {}) });
+  const j = await r.json().catch(() => null);
+  if (!r.ok) { const e = new Error((j && j.message) || 'HTTP ' + r.status); e.code = j && j.message; throw e; }
+  return j;
+}
 
-async function pullRemote(){
-  const r = await fetch(ghUrl(syncCfg, 'contents/data.json'), {headers: ghHeaders(syncCfg.token), cache: 'no-store'});
-  if (r.status === 404) { remoteSha = null; return null; }
-  if (!r.ok) throw new SyncError(r.status);
-  const j = await r.json();
-  let content = j.content;
-  if (!content) { // archivos de más de 1 MB
-    const br = await fetch(ghUrl(syncCfg, 'git/blobs/' + j.sha), {headers: ghHeaders(syncCfg.token), cache: 'no-store'});
-    if (!br.ok) throw new SyncError(br.status);
-    content = (await br.json()).content;
-  }
-  remoteSha = j.sha;
-  return migrate(JSON.parse(b64dec(content)));
-}
-async function pushRemote(){
-  const body = { message: 'Mi Plata: datos actualizados', content: b64enc(JSON.stringify(S)) };
-  if (remoteSha) body.sha = remoteSha;
-  const r = await fetch(ghUrl(syncCfg, 'contents/data.json'), {method: 'PUT', headers: ghHeaders(syncCfg.token), body: JSON.stringify(body)});
-  if (r.status === 409 || r.status === 422) return false; // otro dispositivo guardó justo antes: reintentar
-  if (!r.ok) throw new SyncError(r.status);
-  remoteSha = (await r.json()).content.sha;
-  return true;
-}
 async function sync(){
-  if (!syncCfg) return;
+  if (!token) return;
   if (syncing) { again = true; return; }
-  if (!navigator.onLine) { setSync('err', 'Sin internet · se sube después'); return; }
+  if (!navigator.onLine) { setSync('err', 'Sin internet · se guarda y sube después'); return; }
   syncing = true; setSync('busy');
   try {
     let done = false;
     for (let i = 0; i < 4 && !done; i++) {
-      const remote = await pullRemote();
+      const res = await rpc('mp_leer', { p_token: token });
+      remoteVersion = res.version;
+      const remote = res.data ? migrate(res.data) : null;
       const before = canon(S);
       if (remote) S = merge(S, remote);
       if (canon(S) !== before) { saveLocal(); render(); if (dlg.open) renderSettings(); }
-      done = (remote && canon(S) === canon(remote)) || await pushRemote();
+      if (remote && canon(S) === canon(remote)) { done = true; break; }
+      const v = await rpc('mp_guardar', { p_token: token, p_data: S, p_version: remoteVersion });
+      if (v >= 0) { remoteVersion = v; done = true; }
     }
     setSync(done ? 'ok' : 'err', done ? '' : 'No se pudo guardar, reintento en un rato');
   } catch (e) {
-    const msg = e.status === 401 ? 'Token vencido o inválido' : e.status === 403 || e.status === 404 ? 'Sin acceso al repo de datos' : 'Sin conexión';
-    setSync('err', msg);
+    if (e.code === 'sesion') { syncing = false; return endSession('Se cerró la sesión (¿cambiaste la contraseña?). Entrá de nuevo.'); }
+    setSync('err', 'Sin conexión · se sube después');
   }
   syncing = false;
   if (again) { again = false; sync(); }
 }
-function schedulePush(){ if (!syncCfg) return; clearTimeout(pushTimer); setSync('busy'); pushTimer = setTimeout(sync, 800); }
+function schedulePush(){ if (!token) return; clearTimeout(pushTimer); setSync('busy'); pushTimer = setTimeout(sync, 800); }
 function setSync(state, msg){
   const p = $('#syncPill');
-  p.hidden = !syncCfg;
+  p.hidden = !token;
   p.className = 'sync-pill ' + (state === 'ok' ? 'ok' : state === 'err' ? 'err' : '');
-  p.textContent = state === 'ok' ? '✓ Sincronizado' : state === 'busy' ? '↻ Guardando…' : '⚠️ ' + (msg || 'Error');
+  p.textContent = state === 'ok' ? '✓ Guardado' : state === 'busy' ? '↻ Guardando…' : '⚠️ ' + (msg || 'Error');
   p.title = msg || '';
 }
 $('#syncPill').onclick = () => sync();
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(); });
 window.addEventListener('online', () => sync());
 setInterval(() => { if (document.visibilityState === 'visible') sync(); }, 30000);
+
+/* pantalla de contraseña */
+let lockMode = 'entrar';
+async function showLock(msg){
+  $('#lock').hidden = false; $('#lockErr').textContent = '';
+  $('#pass1').value = ''; $('#pass2').value = '';
+  $('#lockMsg').textContent = 'Cargando…'; $('#lockForm').hidden = true;
+  let existe;
+  try { existe = await rpc('mp_estado'); }
+  catch { $('#lockMsg').textContent = 'Necesitás internet para entrar. Revisá la conexión y volvé a abrir la página.'; return; }
+  lockMode = existe ? 'entrar' : 'crear';
+  $('#lockMsg').textContent = msg || (existe ? 'Poné tu contraseña para entrar.' : 'Primera vez: elegí una contraseña. La vas a usar para entrar desde el celular y la Mac.');
+  $('#pass2').hidden = existe;
+  $('#pass1').autocomplete = existe ? 'current-password' : 'new-password';
+  $('#lockBtn').textContent = existe ? 'Entrar' : 'Crear contraseña y entrar';
+  $('#lockForm').hidden = false;
+  $('#pass1').focus();
+}
+$('#lockForm').onsubmit = async e => {
+  e.preventDefault();
+  const p1 = $('#pass1').value, err = m => $('#lockErr').textContent = m;
+  if (lockMode === 'crear') {
+    if (p1.length < 6) return err('Tiene que tener al menos 6 caracteres.');
+    if (p1 !== $('#pass2').value) return err('Las dos contraseñas no coinciden.');
+  } else if (!p1) return err('Poné la contraseña.');
+  $('#lockBtn').disabled = true; err('');
+  try {
+    const t = await rpc(lockMode === 'crear' ? 'mp_crear' : 'mp_entrar', { p_pass: p1 });
+    if (!t) { err('Contraseña incorrecta.'); $('#pass1').select(); return; }
+    startSession(t);
+  } catch (ex) {
+    err(ex.code === 'bloqueado' ? 'Demasiados intentos. Esperá 15 minutos.' :
+        ex.code === 'ya_existe' ? 'Ya hay una contraseña creada. Recargá la página.' : 'No hay conexión. Probá de nuevo.');
+  } finally { $('#lockBtn').disabled = false; }
+};
+async function startSession(t){
+  token = t; localStorage.setItem(SESSION_KEY, t);
+  $('#lock').hidden = true;
+  render(); await sync();
+  if (!sortedRates().length) { renderSettings(); dlg.showModal(); }
+}
+function endSession(msg){
+  token = null; localStorage.removeItem(SESSION_KEY);
+  S = defaults(); localStorage.removeItem(KEY);   // los datos quedan guardados en la cuenta
+  if (dlg.open) dlg.close();
+  setSync('ok'); render(); showLock(msg);
+}
 
 /* ---------- configuración ---------- */
 const dlg = $('#settings');
@@ -608,9 +645,6 @@ function renderSettings(){
      <button class="del" data-rdel="${r.from}" aria-label="Borrar monto">✕</button></div>`).join('');
   $('#workdays').innerHTML = WD.map(([l,n]) => `<span class="chip ${workdays().includes(n)?'on':''}" data-wd="${n}">${l}</span>`).join('');
   $('#initial').value = initial() ? String(initial()).replace('.', ',') : '';
-  $('#syncOff').hidden = !!syncCfg; $('#syncOn').hidden = !syncCfg;
-  if (syncCfg) $('#syncWhere').textContent = `${syncCfg.owner}/${syncCfg.repo}`;
-  else { if (!$('#syncOwner').value) $('#syncOwner').value = DEFAULT_SYNC.owner; if (!$('#syncRepo').value) $('#syncRepo').value = DEFAULT_SYNC.repo; }
 }
 $('#openSettings').onclick = () => { $('#rateFrom').value = ''; renderSettings(); dlg.showModal(); };
 $('#closeSettings').onclick = () => dlg.close();
@@ -644,27 +678,23 @@ $('#saveInitial').onclick = () => {
   $('#saveInitial').textContent = '✓ Guardado'; setTimeout(() => $('#saveInitial').textContent = 'Guardar', 1200);
 };
 
-$('#syncConnect').onclick = async () => {
-  const c = { owner: $('#syncOwner').value.trim(), repo: $('#syncRepo').value.trim(), token: $('#syncToken').value.trim() };
-  const err = m => $('#syncErr').textContent = m;
-  if (!c.owner || !c.repo || !c.token) return err('Completá usuario, repositorio y token.');
-  err('Probando conexión…');
-  let r;
-  try { r = await fetch(`https://api.github.com/repos/${encodeURIComponent(c.owner)}/${encodeURIComponent(c.repo)}`, {headers: ghHeaders(c.token), cache: 'no-store'}); }
-  catch { return err('No hay conexión a internet.'); }
-  if (r.status === 401) return err('El token no es válido. Copialo de nuevo.');
-  if (!r.ok) return err(`El token no tiene acceso a ${c.owner}/${c.repo}. Revisá los pasos 3 y 4.`);
-  err('');
-  syncCfg = c; localStorage.setItem(SYNC_KEY, JSON.stringify(c));
-  $('#syncToken').value = '';
-  renderSettings(); render();
-  await sync();
-  renderSettings();
+$('#changePass').onclick = async () => {
+  const err = m => $('#passErr').textContent = m;
+  const vieja = $('#oldPass').value, nueva = $('#newPass').value;
+  if (!vieja || nueva.length < 6) return err('Poné la actual y una nueva de al menos 6 caracteres.');
+  try {
+    const t = await rpc('mp_cambiar', { p_token: token, p_vieja: vieja, p_nueva: nueva });
+    if (!t) return err('La contraseña actual no es correcta.');
+    token = t; localStorage.setItem(SESSION_KEY, t);
+    $('#oldPass').value = ''; $('#newPass').value = '';
+    err('✓ Cambiada. En el otro dispositivo vas a tener que entrar con la nueva.');
+  } catch (ex) { err(ex.code === 'sesion' ? 'Se cerró la sesión, entrá de nuevo.' : 'No hay conexión. Probá de nuevo.'); }
 };
-$('#syncNow').onclick = () => sync();
-$('#syncDisconnect').onclick = () => {
-  if (!confirm('¿Desconectar este dispositivo? Los datos quedan acá y en GitHub, pero dejan de sincronizarse.')) return;
-  syncCfg = null; localStorage.removeItem(SYNC_KEY); setSync('ok'); renderSettings(); render();
+$('#logout').onclick = async () => {
+  if (!confirm('¿Salir en este dispositivo? Tus datos quedan guardados; para volver a entrar necesitás la contraseña.')) return;
+  await sync();
+  rpc('mp_salir', { p_token: token }).catch(() => {});
+  endSession();
 };
 
 $('#exportBtn').onclick = () => {
@@ -685,7 +715,7 @@ $('#importFile').onchange = async e => {
   e.target.value = '';
 };
 $('#resetBtn').onclick = () => {
-  if (!(confirm('¿Borrar TODOS los datos' + (syncCfg ? ' (también en tus otros dispositivos)' : '') + '? No se puede deshacer.')
+  if (!(confirm('¿Borrar TODOS los datos (también en el celular y la Mac)? No se puede deshacer.')
         && confirm('¿Seguro? Te conviene exportar una copia antes.'))) return;
   const t = now(), o = {};
   for (const d of Object.keys(S.overrides)) o[d] = {v:null, t};
@@ -701,8 +731,8 @@ $('#date').value = today();
 renderCats();
 render();
 setSync('busy');
-if (syncCfg) sync(); else $('#syncPill').hidden = true;
-if (!sortedRates().length) { renderSettings(); dlg.showModal(); }
+if (token) { sync().then(() => { if (token && !sortedRates().length) { renderSettings(); dlg.showModal(); } }); }
+else showLock();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>

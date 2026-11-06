@@ -11,9 +11,11 @@ App web para controlar la plata del día a día:
 
 **Web:** https://packoeste.github.io/mi-plata/
 
-## Dónde están los datos
+## Contraseña y datos
 
-Este repositorio es **público** pero solo tiene el código de la página: **no contiene ningún dato**.
-Los movimientos se guardan en cada dispositivo y, si se conecta la sincronización,
-en el archivo `data.json` del repositorio **privado** `mi-plata-datos`, que es un archivo aparte.
-Cada dispositivo se conecta con su propio token de GitHub con acceso solo a ese repositorio.
+- Se entra con **una sola contraseña**, la misma en el celular y en la Mac. La primera vez que se abre la web, se elige.
+- Los datos se guardan en una base de datos propia (proyecto Supabase `mi-plata`, **aparte** del de Pack Oeste),
+  así que se ven iguales en todos los dispositivos.
+- Este repositorio es público pero solo tiene el código de la página: **no contiene ningún dato**.
+  La contraseña se guarda encriptada y sin ella no se puede leer ni escribir nada.
+- La estructura de la base está en [`supabase/esquema.sql`](supabase/esquema.sql).
