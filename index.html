@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Mi Plata">
+<title>Mi Plata — control diario</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root{
+    --bg:#0f1115; --card:#181b22; --card2:#20242e; --line:#2b303c;
+    --text:#eceef3; --muted:#8d95a8;
+    --green:#3ecf8e; --red:#ff6b6b; --blue:#5b9dff; --amber:#f5b94a;
+    --r:16px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  body{padding:env(safe-area-inset-top) 0 40px}
+  .wrap{max-width:560px;margin:0 auto;padding:16px}
+  header{display:flex;align-items:center;justify-content:space-between;margin:4px 0 14px}
+  header h1{font-size:20px;margin:0;font-weight:700;letter-spacing:-.2px}
+  .icon-btn{background:var(--card);border:1px solid var(--line);color:var(--text);
+    width:40px;height:40px;border-radius:12px;font-size:18px;cursor:pointer}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:14px}
+  .label{color:var(--muted);font-size:13px;margin:0 0 4px}
+  .hero .big{font-size:40px;font-weight:800;letter-spacing:-1px;margin:2px 0 10px;font-variant-numeric:tabular-nums}
+  .hero .big.neg{color:var(--red)}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .stat{background:var(--card2);border-radius:12px;padding:10px}
+  .stat b{display:block;font-size:15px;font-variant-numeric:tabular-nums;margin-top:2px}
+  .stat span{font-size:12px;color:var(--muted)}
+  .proj{font-size:13px;color:var(--muted);margin-top:10px}
+  .proj b{color:var(--text)}
+  .g{color:var(--green)} .r{color:var(--red)} .b{color:var(--blue)}
+
+  .today{display:flex;gap:10px;align-items:center;justify-content:space-between}
+  .today .t1{font-size:15px;font-weight:600}
+  .today .t2{font-size:13px;color:var(--muted);margin-top:2px}
+  .btn{background:var(--card2);border:1px solid var(--line);color:var(--text);
+    padding:9px 12px;border-radius:10px;font-size:13px;cursor:pointer;white-space:nowrap}
+  .btn:hover{border-color:#3a4150}
+  .btn.danger{color:var(--red)}
+
+  .seg{display:grid;grid-template-columns:1fr 1fr;background:var(--card2);border-radius:12px;padding:4px;margin-bottom:12px}
+  .seg button{background:none;border:0;color:var(--muted);padding:10px;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer}
+  .seg button.on{background:var(--bg);color:var(--text)}
+  .seg button.on[data-type=gasto]{color:var(--red)}
+  .seg button.on[data-type=extra]{color:var(--green)}
+  .amount-row{display:flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--line);
+    border-radius:12px;padding:6px 14px;margin-bottom:12px}
+  .amount-row span{font-size:26px;color:var(--muted);font-weight:700}
+  .amount-row input{flex:1;background:none;border:0;color:var(--text);font-size:30px;font-weight:800;
+    outline:none;padding:6px 0;min-width:0;font-variant-numeric:tabular-nums}
+  .cats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+  .chip{background:var(--card2);border:1px solid var(--line);color:var(--text);padding:7px 10px;border-radius:999px;
+    font-size:13px;cursor:pointer;user-select:none}
+  .chip.on{border-color:var(--blue);background:rgba(91,157,255,.15)}
+  .row{display:flex;gap:8px;margin-bottom:12px}
+  input[type=text],input[type=date],input[type=password],input:not([type]){background:var(--card2);border:1px solid var(--line);color:var(--text);
+    border-radius:10px;padding:10px 12px;font-size:15px;outline:none;min-width:0;font-family:inherit}
+  input[type=date]{color-scheme:dark}
+  .row input{flex:1}
+  .row input[type=date]{flex:0 0 150px}
+  input:focus{border-color:var(--blue)}
+  .primary{width:100%;border:0;border-radius:12px;padding:14px;font-size:16px;font-weight:700;cursor:pointer;color:#0b0d11}
+  .primary.gasto{background:var(--red)} .primary.extra{background:var(--green)}
+  .primary.neutral{background:var(--blue)}
+  .err{color:var(--red);font-size:13px;margin:-4px 0 10px;min-height:0}
+
+  .month-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .month-nav h2{font-size:17px;margin:0;text-transform:capitalize}
+  .stats4{grid-template-columns:repeat(2,1fr)}
+  .bars{margin-top:4px}
+  .bar{margin:10px 0}
+  .bar .top{display:flex;justify-content:space-between;font-size:14px;margin-bottom:5px}
+  .bar .top em{font-style:normal;color:var(--muted);font-size:12px;margin-left:6px}
+  .bar .track{height:8px;background:var(--card2);border-radius:99px;overflow:hidden}
+  .bar .fill{height:100%;background:var(--red);border-radius:99px}
+  .empty{color:var(--muted);font-size:14px;text-align:center;padding:10px 0}
+
+  .day{border-top:1px solid var(--line);padding:12px 0 6px}
+  .day:first-child{border-top:0;padding-top:0}
+  .day-h{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .day-h .d{flex:1;font-weight:600;font-size:14px;text-transform:capitalize}
+  .day-h .net{font-size:13px;font-variant-numeric:tabular-nums}
+  .jor{font-size:12px;padding:4px 9px;border-radius:99px;border:1px solid var(--line);background:var(--card2);cursor:pointer;color:var(--muted)}
+  .jor.on{color:var(--green);border-color:rgba(62,207,142,.4)}
+  .jor.off.nt{text-decoration:line-through}
+  .item{display:flex;align-items:center;gap:10px;padding:7px 0}
+  .item .ic{width:34px;height:34px;border-radius:10px;background:var(--card2);display:grid;place-items:center;font-size:16px;flex:0 0 34px}
+  .item .tx{flex:1;min-width:0}
+  .item .tx b{display:block;font-size:14px;font-weight:600}
+  .item .tx small{color:var(--muted);font-size:12px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .item .am{font-weight:700;font-variant-numeric:tabular-nums;font-size:14px}
+  .del{background:none;border:0;color:var(--muted);font-size:16px;cursor:pointer;padding:4px 6px;border-radius:8px}
+  .del:hover{color:var(--red);background:var(--card2)}
+
+  dialog{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:20px;
+    padding:0;width:min(520px,94vw);max-height:90vh}
+  dialog::backdrop{background:rgba(0,0,0,.6)}
+  .dlg{padding:18px;overflow:auto;max-height:90vh}
+  .dlg h3{margin:0 0 4px;font-size:18px}
+  .dlg h4{margin:20px 0 8px;font-size:14px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  .dlg p.help{color:var(--muted);font-size:13px;margin:0 0 10px;line-height:1.4}
+  .welcome{background:rgba(91,157,255,.12);border:1px solid rgba(91,157,255,.35);border-radius:12px;padding:12px;font-size:14px;line-height:1.45;margin:10px 0}
+  .wd{display:flex;gap:6px;flex-wrap:wrap}
+  .wd .chip{width:42px;text-align:center;padding:9px 0}
+  .list-mini{font-size:14px}
+  .list-mini div{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+  .flex{display:flex;gap:8px;flex-wrap:wrap}
+  .close-x{float:right}
+  .hdr-r{display:flex;gap:8px;align-items:center}
+  .sync-pill{background:var(--card);border:1px solid var(--line);color:var(--muted);height:40px;padding:0 12px;
+    border-radius:12px;font-size:13px;cursor:pointer;white-space:nowrap}
+  .sync-pill.ok{color:var(--green)} .sync-pill.err{color:var(--amber)}
+  .steps{padding-left:20px;margin:0 0 12px} .steps li{margin:5px 0}
+  a{color:var(--blue)}
+  footer{color:var(--muted);font-size:12px;text-align:center;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>💸 Mi Plata</h1>
+    <div class="hdr-r">
+      <button class="sync-pill" id="syncPill" hidden></button>
+      <button class="icon-btn" id="openSettings" title="Configuración" aria-label="Configuración">⚙️</button>
+    </div>
+  </header>
+
+  <!-- Disponible -->
+  <section class="card hero">
+    <p class="label">Disponible hoy</p>
+    <div class="big" id="available">$ 0</div>
+    <div class="stats">
+      <div class="stat"><span>Ganado por días</span><b class="g" id="tEarned">$ 0</b></div>
+      <div class="stat"><span>Extras</span><b class="b" id="tExtras">$ 0</b></div>
+      <div class="stat"><span>Gastos</span><b class="r" id="tGastos">$ 0</b></div>
+    </div>
+    <div class="proj" id="proj"></div>
+  </section>
+
+  <!-- Hoy -->
+  <section class="card today">
+    <div>
+      <div class="t1" id="todayT1">Hoy</div>
+      <div class="t2" id="todayT2"></div>
+    </div>
+    <button class="btn" id="toggleToday">Hoy no trabajé</button>
+  </section>
+
+  <!-- Cargar -->
+  <section class="card">
+    <form id="addForm" autocomplete="off">
+      <div class="seg">
+        <button type="button" data-type="gasto" class="on">Gasto</button>
+        <button type="button" data-type="extra">Ingreso extra</button>
+      </div>
+      <div class="amount-row"><span>$</span><input id="amount" inputmode="decimal" placeholder="0" aria-label="Monto"></div>
+      <div class="cats" id="cats"></div>
+      <div class="row">
+        <input type="text" id="note" placeholder="Nota (opcional)">
+        <input type="date" id="date" aria-label="Fecha">
+      </div>
+      <div class="err" id="err"></div>
+      <button class="primary gasto" id="submitBtn">Cargar gasto</button>
+    </form>
+  </section>
+
+  <!-- Mes -->
+  <section class="card">
+    <div class="month-nav">
+      <button class="icon-btn" id="prevM" aria-label="Mes anterior">‹</button>
+      <h2 id="monthTitle"></h2>
+      <button class="icon-btn" id="nextM" aria-label="Mes siguiente">›</button>
+    </div>
+    <div class="stats stats4">
+      <div class="stat"><span id="mDaysLbl">Días trabajados</span><b class="g" id="mEarned">$ 0</b></div>
+      <div class="stat"><span>Extras</span><b class="b" id="mExtras">$ 0</b></div>
+      <div class="stat"><span>Gastos</span><b class="r" id="mGastos">$ 0</b></div>
+      <div class="stat"><span>Balance del mes</span><b id="mBal">$ 0</b></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <p class="label">Gastos por categoría</p>
+    <div class="bars" id="bars"></div>
+  </section>
+
+  <section class="card">
+    <p class="label" style="margin-bottom:10px">Día por día</p>
+    <div id="diary"></div>
+  </section>
+
+  <footer id="footer"></footer>
+</div>
+
+<!-- Configuración -->
+<dialog id="settings">
+  <div class="dlg">
+    <button class="icon-btn close-x" id="closeSettings" aria-label="Cerrar">✕</button>
+    <h3>Configuración</h3>
+    <div class="welcome" id="welcome" hidden>
+      👋 ¡Bienvenido! Primero cargá <b>cuánto ganás por día</b> y <b>qué días trabajás</b>.
+      La app va sumando sola tu jornada cada día que trabajás. Después solo cargás los gastos y los extras.<br><br>
+      ¿Ya la usás en otro dispositivo? Conectá la <b>sincronización</b> acá abajo y se bajan tus datos.
+    </div>
+
+    <h4>Sincronización (celular ↔ Mac)</h4>
+    <div id="syncOff">
+      <p class="help">Tus datos se guardan en un repositorio <b>privado</b> de tu GitHub, aparte de la página.
+        Hacelo una vez en cada dispositivo:</p>
+      <ol class="help steps">
+        <li>Abrí <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">crear un token en GitHub</a>.</li>
+        <li>Poné un nombre (ej. "Mi Plata celular") y la <b>expiración más larga</b> que te deje.</li>
+        <li>En <b>Repository access</b> elegí <b>Only select repositories</b> → <b>mi-plata-datos</b>.</li>
+        <li>En <b>Permissions → Repository permissions → Contents</b> elegí <b>Read and write</b>.</li>
+        <li>Tocá <b>Generate token</b>, copialo, pegalo acá y tocá Conectar.</li>
+      </ol>
+      <div class="row"><input id="syncOwner" placeholder="Usuario de GitHub" aria-label="Usuario de GitHub"><input id="syncRepo" placeholder="Repositorio de datos" aria-label="Repositorio de datos"></div>
+      <div class="row"><input type="password" id="syncToken" placeholder="Token (github_pat_…)" aria-label="Token" autocomplete="off"><button class="btn" id="syncConnect" type="button">Conectar</button></div>
+      <div class="err" id="syncErr"></div>
+    </div>
+    <div id="syncOn" hidden>
+      <p class="help">✓ Conectado a <b id="syncWhere"></b>. Lo que cargues acá aparece en tus otros dispositivos.</p>
+      <div class="flex">
+        <button class="btn" id="syncNow" type="button">↻ Sincronizar ahora</button>
+        <button class="btn danger" id="syncDisconnect" type="button">Desconectar este dispositivo</button>
+      </div>
+    </div>
+
+    <h4>Ganancia por día</h4>
+    <p class="help">Si te aumentan, cargá el nuevo monto con la fecha desde la que aplica: los días anteriores quedan con el monto viejo.</p>
+    <div class="amount-row"><span>$</span><input id="rateAmount" inputmode="decimal" placeholder="0" aria-label="Ganancia por día"></div>
+    <div class="row">
+      <input type="date" id="rateFrom" aria-label="Aplica desde" style="flex:1">
+      <button class="btn" id="saveRate" type="button">Guardar monto</button>
+    </div>
+    <div class="list-mini" id="rateList"></div>
+
+    <h4>Días que trabajás</h4>
+    <div class="wd" id="workdays"></div>
+
+    <h4>Plata que ya tenías</h4>
+    <p class="help">Saldo con el que arrancás (efectivo + cuenta). Se suma al disponible.</p>
+    <div class="row">
+      <div class="amount-row" style="flex:1;margin:0"><span>$</span><input id="initial" inputmode="decimal" placeholder="0" aria-label="Saldo inicial" style="font-size:22px"></div>
+      <button class="btn" id="saveInitial" type="button">Guardar</button>
+    </div>
+
+    <h4>Copia de seguridad</h4>
+    <div class="flex">
+      <button class="btn" id="exportBtn" type="button">⬇️ Exportar</button>
+      <button class="btn" id="importBtn" type="button">⬆️ Importar</button>
+      <button class="btn danger" id="resetBtn" type="button">Borrar todo</button>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
+    </div>
+  </div>
+</dialog>
+
+<script>
+const KEY = 'miPlata.v1';
+const SYNC_KEY = 'miPlata.sync';
+const DEFAULT_SYNC = { owner: 'packoeste', repo: 'mi-plata-datos' };
+const CATS = {
+  gasto: [
+    {id:'comida', name:'Comida', icon:'🍔'},
+    {id:'super', name:'Súper', icon:'🛒'},
+    {id:'transporte', name:'Transporte', icon:'🚌'},
+    {id:'nafta', name:'Nafta', icon:'⛽'},
+    {id:'servicios', name:'Servicios', icon:'💡'},
+    {id:'alquiler', name:'Alquiler', icon:'🏠'},
+    {id:'salud', name:'Salud', icon:'💊'},
+    {id:'salidas', name:'Salidas', icon:'🎉'},
+    {id:'ropa', name:'Ropa', icon:'👕'},
+    {id:'cuotas', name:'Cuotas/Deudas', icon:'💳'},
+    {id:'otros', name:'Otros', icon:'📦'},
+  ],
+  extra: [
+    {id:'horas', name:'Horas extra', icon:'⏱️'},
+    {id:'changa', name:'Changa', icon:'🔧'},
+    {id:'propina', name:'Propina', icon:'🪙'},
+    {id:'venta', name:'Venta', icon:'🏷️'},
+    {id:'bono', name:'Bono/Premio', icon:'🏆'},
+    {id:'regalo', name:'Regalo', icon:'🎁'},
+    {id:'otros_i', name:'Otros', icon:'➕'},
+  ]
+};
+const catOf = (type, id) => CATS[type].find(c => c.id === id) || {name:'Otros', icon:'📦'};
+const WD = [['L',1],['M',2],['X',3],['J',4],['V',5],['S',6],['D',0]];
+const $ = s => document.querySelector(s);
+const now = () => Date.now();
+
+/* ---------- estado ----------
+   Cada dato lleva "t" (cuándo se cambió). Al sincronizar gana el cambio más nuevo,
+   y lo borrado queda marcado (del:true) para que se borre también en los otros dispositivos. */
+const DEF_WD = [1,2,3,4,5];
+const defaults = () => ({ v:2, entries:[], rates:[], overrides:{}, workdays:{v:DEF_WD.slice(), t:0}, initial:{v:0, t:0} });
+function migrate(s){
+  if (!s || typeof s !== 'object') return defaults();
+  if (s.v === 2) return Object.assign(defaults(), s);
+  const o = {};
+  for (const [d, v] of Object.entries(s.overrides || {})) o[d] = {v, t:1};
+  return { v:2,
+    entries: (s.entries || []).map(e => ({...e, t: e.t || 1})),
+    rates: (s.rates || []).map(r => ({...r, t: r.t || 1})),
+    overrides: o,
+    workdays: {v: Array.isArray(s.workdays) ? s.workdays : DEF_WD.slice(), t: 1},
+    initial: {v: Number(s.initial) || 0, t: 1} };
+}
+function load(){ try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) return migrate(s); } catch(e){} return defaults(); }
+let S = load();
+const saveLocal = () => localStorage.setItem(KEY, JSON.stringify(S));
+const save = () => { saveLocal(); schedulePush(); };
+
+const liveEntries = () => S.entries.filter(e => !e.del);
+const sortedRates = () => S.rates.filter(r => !r.del).sort((a,b) => a.from.localeCompare(b.from));
+const workdays = () => S.workdays.v;
+const initial = () => S.initial.v;
+const overrideOf = d => { const o = S.overrides[d]; return o && o.v !== null && o.v !== undefined ? o.v : undefined; };
+
+/* ---------- combinar datos de dos dispositivos ---------- */
+const tOf = x => (x && x.t) || 0;
+function mergeArr(a, b, key){
+  const m = new Map();
+  for (const x of [...(a||[]), ...(b||[])]) { const cur = m.get(x[key]); if (!cur || tOf(x) > tOf(cur)) m.set(x[key], x); }
+  return [...m.values()].sort((x,y) => String(x[key]).localeCompare(String(y[key])));
+}
+function mergeObj(a, b){
+  const out = {};
+  for (const k of new Set([...Object.keys(a||{}), ...Object.keys(b||{})].sort())) {
+    const x = (a||{})[k], y = (b||{})[k];
+    out[k] = !x ? y : !y ? x : (tOf(y) > tOf(x) ? y : x);
+  }
+  return out;
+}
+const newer = (x, y) => tOf(y) > tOf(x) ? y : x;
+const merge = (a, b) => ({ v:2,
+  entries: mergeArr(a.entries, b.entries, 'id'),
+  rates: mergeArr(a.rates, b.rates, 'from'),
+  overrides: mergeObj(a.overrides, b.overrides),
+  workdays: newer(a.workdays, b.workdays),
+  initial: newer(a.initial, b.initial) });
+const canon = x => JSON.stringify(x, (k, v) => v && typeof v === 'object' && !Array.isArray(v)
+  ? Object.keys(v).sort().reduce((o, kk) => (o[kk] = v[kk], o), {}) : v);
+
+/* ---------- fechas ---------- */
+const pad = n => String(n).padStart(2,'0');
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parse = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+const today = () => iso(new Date());
+const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate()+n); return iso(d); };
+const monthStart = ym => ym + '-01';
+const monthEnd = ym => { const [y,m] = ym.split('-').map(Number); return iso(new Date(y, m, 0)); };
+const shiftMonth = (ym, n) => { const [y,m] = ym.split('-').map(Number); const d = new Date(y, m-1+n, 1); return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; };
+
+/* ---------- plata ---------- */
+const nf0 = new Intl.NumberFormat('es-AR', {style:'currency', currency:'ARS', minimumFractionDigits:0, maximumFractionDigits:0});
+const nf2 = new Intl.NumberFormat('es-AR', {style:'currency', currency:'ARS', minimumFractionDigits:2, maximumFractionDigits:2});
+const fmt = n => { const v = Math.round(n*100)/100; return (Number.isInteger(v) ? nf0 : nf2).format(v); };
+function parseAmount(str){
+  let s = String(str).trim().replace(/[\s$]/g,'');
+  if (!s) return NaN;
+  if (s.includes(',')) s = s.replace(/\./g,'').replace(',', '.');
+  else if ((s.match(/\./g)||[]).length > 1 || /\.\d{3}$/.test(s)) s = s.replace(/\./g,'');
+  return Number(s);
+}
+
+/* ---------- cálculo de jornadas ---------- */
+function rateFor(d){ let r = null; for (const x of sortedRates()) if (x.from <= d) r = x; return r; }
+const scheduled = d => workdays().includes(parse(d).getDay());
+const worked = d => { if (!rateFor(d)) return false; const o = overrideOf(d); return o !== undefined ? o : scheduled(d); };
+const earnedOn = d => worked(d) ? rateFor(d).daily : 0;
+function earnedBetween(a, b){
+  const rs = sortedRates(); if (!rs.length) return {sum:0, days:0};
+  let d = a < rs[0].from ? rs[0].from : a, sum = 0, days = 0;
+  for (; d <= b; d = addDays(d,1)) if (worked(d)) { sum += rateFor(d).daily; days++; }
+  return {sum, days};
+}
+const sumEntries = (type, pred) => liveEntries().filter(e => e.type === type && pred(e)).reduce((a,e) => a + e.amount, 0);
+
+/* ---------- UI: formulario ---------- */
+let curType = 'gasto', curCat = 'comida';
+function renderCats(){
+  $('#cats').innerHTML = CATS[curType].map(c =>
+    `<span class="chip ${c.id===curCat?'on':''}" data-cat="${c.id}">${c.icon} ${c.name}</span>`).join('');
+}
+document.querySelectorAll('.seg button').forEach(b => b.onclick = () => {
+  curType = b.dataset.type; curCat = CATS[curType][0].id;
+  document.querySelectorAll('.seg button').forEach(x => x.classList.toggle('on', x === b));
+  const btn = $('#submitBtn');
+  btn.className = 'primary ' + curType;
+  btn.textContent = curType === 'gasto' ? 'Cargar gasto' : 'Cargar ingreso extra';
+  renderCats(); $('#amount').focus();
+});
+$('#cats').onclick = e => { const c = e.target.closest('[data-cat]'); if (!c) return; curCat = c.dataset.cat; renderCats(); };
+
+$('#addForm').onsubmit = e => {
+  e.preventDefault();
+  const amount = parseAmount($('#amount').value);
+  if (!(amount > 0)) { $('#err').textContent = 'Poné un monto válido.'; $('#amount').focus(); return; }
+  $('#err').textContent = '';
+  S.entries.push({
+    id: now().toString(36) + Math.random().toString(36).slice(2,6),
+    type: curType, amount, category: curCat,
+    note: $('#note').value.trim(), date: $('#date').value || today(), t: now()
+  });
+  save();
+  viewMonth = ($('#date').value || today()).slice(0,7);
+  $('#amount').value = ''; $('#note').value = '';
+  render();
+  $('#amount').focus();
+};
+
+/* ---------- UI: render ---------- */
+let viewMonth = today().slice(0,7);
+
+function render(){
+  const t = today();
+  const rs = sortedRates();
+
+  const earned = rs.length ? earnedBetween(rs[0].from, t).sum : 0;
+  const extras = sumEntries('extra', e => e.date <= t);
+  const gastos = sumEntries('gasto', e => e.date <= t);
+  const avail = initial() + earned + extras - gastos;
+  $('#available').textContent = fmt(avail);
+  $('#available').classList.toggle('neg', avail < 0);
+  $('#tEarned').textContent = fmt(earned);
+  $('#tExtras').textContent = fmt(extras);
+  $('#tGastos').textContent = fmt(gastos);
+
+  const ym = t.slice(0,7), mEnd = monthEnd(ym), dayN = parse(t).getDate();
+  const left = parse(mEnd).getDate() - dayN;
+  const spentMonth = sumEntries('gasto', e => e.date.startsWith(ym) && e.date <= t);
+  const futureEarn = left > 0 ? earnedBetween(addDays(t,1), mEnd).sum : 0;
+  const avg = spentMonth / dayN;
+  const proj = avail + futureEarn - avg * left;
+  $('#proj').innerHTML = rs.length
+    ? `Gastás en promedio <b>${fmt(avg)}</b> por día este mes · Si seguís así, a fin de mes te quedan <b class="${proj<0?'r':''}">${fmt(proj)}</b>`
+    : `Tocá ⚙️ para cargar cuánto ganás por día.`;
+
+  const spentToday = sumEntries('gasto', e => e.date === t);
+  const extraToday = sumEntries('extra', e => e.date === t);
+  const w = worked(t);
+  $('#todayT1').innerHTML = !rateFor(t) ? 'Hoy' :
+    (w ? `Hoy ganaste <span class="g">${fmt(earnedOn(t))}</span>` : 'Hoy no sumás jornada');
+  $('#todayT2').textContent = `Gastaste ${fmt(spentToday)}` + (extraToday ? ` · Extras ${fmt(extraToday)}` : '');
+  $('#toggleToday').hidden = !rateFor(t);
+  $('#toggleToday').textContent = w ? 'Hoy no trabajé' : 'Hoy trabajé';
+
+  $('#footer').textContent = syncCfg
+    ? 'Tus datos se sincronizan con tu repositorio privado de GitHub.'
+    : 'Los datos se guardan solo en este dispositivo. Conectá la sincronización en ⚙️ para verlos en el celular y en la Mac.';
+
+  renderMonth();
+}
+
+function renderMonth(){
+  const t = today(), a = monthStart(viewMonth), b = monthEnd(viewMonth);
+  $('#monthTitle').textContent = parse(a).toLocaleDateString('es-AR', {month:'long', year:'numeric'});
+  const until = b < t ? b : t;
+  const er = a <= t ? earnedBetween(a, until) : {sum:0, days:0};
+  const inM = e => e.date >= a && e.date <= b;
+  const mx = sumEntries('extra', inM), mg = sumEntries('gasto', inM);
+  $('#mDaysLbl').textContent = `Jornadas (${er.days} día${er.days===1?'':'s'})`;
+  $('#mEarned').textContent = fmt(er.sum);
+  $('#mExtras').textContent = fmt(mx);
+  $('#mGastos').textContent = fmt(mg);
+  const bal = er.sum + mx - mg;
+  $('#mBal').textContent = fmt(bal);
+  $('#mBal').className = bal < 0 ? 'r' : 'g';
+
+  const byCat = {};
+  liveEntries().filter(e => e.type === 'gasto' && inM(e)).forEach(e => byCat[e.category] = (byCat[e.category]||0) + e.amount);
+  const cats = Object.entries(byCat).sort((x,y) => y[1]-x[1]);
+  const max = cats.length ? cats[0][1] : 1;
+  $('#bars').innerHTML = cats.length ? cats.map(([id, v]) => {
+    const c = catOf('gasto', id);
+    return `<div class="bar"><div class="top"><span>${c.icon} ${c.name}<em>${Math.round(v/mg*100)}%</em></span><b>${fmt(v)}</b></div>
+      <div class="track"><div class="fill" style="width:${(v/max*100).toFixed(1)}%"></div></div></div>`;
+  }).join('') : '<div class="empty">Todavía no cargaste gastos este mes.</div>';
+
+  const all = liveEntries();
+  const daysWithEntries = new Set(all.filter(inM).map(e => e.date));
+  const days = [];
+  for (let d = b; d >= a; d = addDays(d,-1)) if (d <= t || daysWithEntries.has(d)) days.push(d);
+  $('#diary').innerHTML = days.length ? days.map(d => {
+    const items = all.filter(e => e.date === d).sort((x,y) => x.id < y.id ? 1 : -1);
+    const r = rateFor(d), w = worked(d), e = earnedOn(d);
+    const net = e + items.reduce((s,i) => s + (i.type==='extra' ? i.amount : -i.amount), 0);
+    let chip = '';
+    if (r && d <= t) chip = w
+      ? `<span class="jor on" data-toggle="${d}" title="Tocá si no trabajaste">Jornada +${fmt(e)}</span>`
+      : `<span class="jor off ${scheduled(d)?'nt':''}" data-toggle="${d}" title="Tocá si trabajaste">${scheduled(d) ? 'No trabajado' : 'Franco'}</span>`;
+    const label = parse(d).toLocaleDateString('es-AR', {weekday:'long', day:'numeric'}) + (d === t ? ' · hoy' : '');
+    return `<div class="day">
+      <div class="day-h"><span class="d">${label}</span>${chip}<span class="net ${net<0?'r':net>0?'g':''}">${net ? (net>0?'+':'') + fmt(net) : ''}</span></div>
+      ${items.map(i => { const c = catOf(i.type, i.category); return `
+        <div class="item"><div class="ic">${c.icon}</div>
+          <div class="tx"><b>${c.name}</b>${i.note ? `<small>${esc(i.note)}</small>` : ''}</div>
+          <span class="am ${i.type==='gasto'?'r':'g'}">${i.type==='gasto'?'−':'+'}${fmt(i.amount)}</span>
+          <button class="del" data-del="${i.id}" aria-label="Borrar">✕</button></div>`; }).join('')}
+    </div>`;
+  }).join('') : '<div class="empty">Nada en este mes.</div>';
+}
+const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function toggleDay(d){
+  const want = !worked(d);
+  S.overrides[d] = {v: want === scheduled(d) ? null : want, t: now()};
+  save(); render();
+}
+$('#diary').onclick = e => {
+  const tg = e.target.closest('[data-toggle]'); if (tg) return toggleDay(tg.dataset.toggle);
+  const dl = e.target.closest('[data-del]');
+  if (dl && confirm('¿Borrar este movimiento?')) {
+    const id = dl.dataset.del;
+    S.entries = S.entries.map(x => x.id === id ? {id, del:true, t:now()} : x);
+    save(); render();
+  }
+};
+$('#toggleToday').onclick = () => toggleDay(today());
+$('#prevM').onclick = () => { viewMonth = shiftMonth(viewMonth,-1); renderMonth(); };
+$('#nextM').onclick = () => { viewMonth = shiftMonth(viewMonth, 1); renderMonth(); };
+
+/* ---------- sincronización con un repo privado de GitHub ---------- */
+let syncCfg = null;
+try { syncCfg = JSON.parse(localStorage.getItem(SYNC_KEY)); } catch(e){}
+let remoteSha = null, syncing = false, again = false, pushTimer = null;
+
+const ghHeaders = token => ({ Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' });
+const ghUrl = (c, path) => `https://api.github.com/repos/${encodeURIComponent(c.owner)}/${encodeURIComponent(c.repo)}/${path}`;
+const b64enc = str => { const by = new TextEncoder().encode(str); let bin = ''; for (let i = 0; i < by.length; i += 0x8000) bin += String.fromCharCode(...by.subarray(i, i + 0x8000)); return btoa(bin); };
+const b64dec = b64 => new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/\s/g,'')), c => c.charCodeAt(0)));
+class SyncError extends Error { constructor(status){ super('HTTP ' + status); this.status = status; } }
+
+async function pullRemote(){
+  const r = await fetch(ghUrl(syncCfg, 'contents/data.json'), {headers: ghHeaders(syncCfg.token), cache: 'no-store'});
+  if (r.status === 404) { remoteSha = null; return null; }
+  if (!r.ok) throw new SyncError(r.status);
+  const j = await r.json();
+  let content = j.content;
+  if (!content) { // archivos de más de 1 MB
+    const br = await fetch(ghUrl(syncCfg, 'git/blobs/' + j.sha), {headers: ghHeaders(syncCfg.token), cache: 'no-store'});
+    if (!br.ok) throw new SyncError(br.status);
+    content = (await br.json()).content;
+  }
+  remoteSha = j.sha;
+  return migrate(JSON.parse(b64dec(content)));
+}
+async function pushRemote(){
+  const body = { message: 'Mi Plata: datos actualizados', content: b64enc(JSON.stringify(S)) };
+  if (remoteSha) body.sha = remoteSha;
+  const r = await fetch(ghUrl(syncCfg, 'contents/data.json'), {method: 'PUT', headers: ghHeaders(syncCfg.token), body: JSON.stringify(body)});
+  if (r.status === 409 || r.status === 422) return false; // otro dispositivo guardó justo antes: reintentar
+  if (!r.ok) throw new SyncError(r.status);
+  remoteSha = (await r.json()).content.sha;
+  return true;
+}
+async function sync(){
+  if (!syncCfg) return;
+  if (syncing) { again = true; return; }
+  if (!navigator.onLine) { setSync('err', 'Sin internet · se sube después'); return; }
+  syncing = true; setSync('busy');
+  try {
+    let done = false;
+    for (let i = 0; i < 4 && !done; i++) {
+      const remote = await pullRemote();
+      const before = canon(S);
+      if (remote) S = merge(S, remote);
+      if (canon(S) !== before) { saveLocal(); render(); if (dlg.open) renderSettings(); }
+      done = (remote && canon(S) === canon(remote)) || await pushRemote();
+    }
+    setSync(done ? 'ok' : 'err', done ? '' : 'No se pudo guardar, reintento en un rato');
+  } catch (e) {
+    const msg = e.status === 401 ? 'Token vencido o inválido' : e.status === 403 || e.status === 404 ? 'Sin acceso al repo de datos' : 'Sin conexión';
+    setSync('err', msg);
+  }
+  syncing = false;
+  if (again) { again = false; sync(); }
+}
+function schedulePush(){ if (!syncCfg) return; clearTimeout(pushTimer); setSync('busy'); pushTimer = setTimeout(sync, 800); }
+function setSync(state, msg){
+  const p = $('#syncPill');
+  p.hidden = !syncCfg;
+  p.className = 'sync-pill ' + (state === 'ok' ? 'ok' : state === 'err' ? 'err' : '');
+  p.textContent = state === 'ok' ? '✓ Sincronizado' : state === 'busy' ? '↻ Guardando…' : '⚠️ ' + (msg || 'Error');
+  p.title = msg || '';
+}
+$('#syncPill').onclick = () => sync();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(); });
+window.addEventListener('online', () => sync());
+setInterval(() => { if (document.visibilityState === 'visible') sync(); }, 30000);
+
+/* ---------- configuración ---------- */
+const dlg = $('#settings');
+function renderSettings(){
+  $('#welcome').hidden = sortedRates().length > 0;
+  if (!$('#rateFrom').value) $('#rateFrom').value = sortedRates().length ? today() : monthStart(today().slice(0,7));
+  $('#rateList').innerHTML = sortedRates().map(r =>
+    `<div><span>Desde ${parse(r.from).toLocaleDateString('es-AR')}: <b>${fmt(r.daily)}</b> por día</span>
+     <button class="del" data-rdel="${r.from}" aria-label="Borrar monto">✕</button></div>`).join('');
+  $('#workdays').innerHTML = WD.map(([l,n]) => `<span class="chip ${workdays().includes(n)?'on':''}" data-wd="${n}">${l}</span>`).join('');
+  $('#initial').value = initial() ? String(initial()).replace('.', ',') : '';
+  $('#syncOff').hidden = !!syncCfg; $('#syncOn').hidden = !syncCfg;
+  if (syncCfg) $('#syncWhere').textContent = `${syncCfg.owner}/${syncCfg.repo}`;
+  else { if (!$('#syncOwner').value) $('#syncOwner').value = DEFAULT_SYNC.owner; if (!$('#syncRepo').value) $('#syncRepo').value = DEFAULT_SYNC.repo; }
+}
+$('#openSettings').onclick = () => { $('#rateFrom').value = ''; renderSettings(); dlg.showModal(); };
+$('#closeSettings').onclick = () => dlg.close();
+dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+
+$('#saveRate').onclick = () => {
+  const v = parseAmount($('#rateAmount').value), from = $('#rateFrom').value;
+  if (!(v > 0) || !from) { alert('Poné el monto por día y la fecha desde la que aplica.'); return; }
+  S.rates = S.rates.filter(r => r.from !== from).concat({from, daily: v, t: now()});
+  save(); $('#rateAmount').value = ''; renderSettings(); render();
+};
+$('#rateList').onclick = e => {
+  const b = e.target.closest('[data-rdel]'); if (!b) return;
+  if (confirm('¿Borrar este monto diario?')) {
+    const from = b.dataset.rdel;
+    S.rates = S.rates.map(r => r.from === from ? {from, del:true, t:now()} : r);
+    save(); renderSettings(); render();
+  }
+};
+$('#workdays').onclick = e => {
+  const c = e.target.closest('[data-wd]'); if (!c) return;
+  const n = Number(c.dataset.wd), cur = workdays();
+  S.workdays = {v: cur.includes(n) ? cur.filter(x => x !== n) : cur.concat(n), t: now()};
+  save(); renderSettings(); render();
+};
+$('#saveInitial').onclick = () => {
+  const raw = $('#initial').value.trim();
+  const v = raw ? parseAmount(raw) : 0;
+  if (isNaN(v)) { alert('Monto inválido.'); return; }
+  S.initial = {v, t: now()}; save(); render();
+  $('#saveInitial').textContent = '✓ Guardado'; setTimeout(() => $('#saveInitial').textContent = 'Guardar', 1200);
+};
+
+$('#syncConnect').onclick = async () => {
+  const c = { owner: $('#syncOwner').value.trim(), repo: $('#syncRepo').value.trim(), token: $('#syncToken').value.trim() };
+  const err = m => $('#syncErr').textContent = m;
+  if (!c.owner || !c.repo || !c.token) return err('Completá usuario, repositorio y token.');
+  err('Probando conexión…');
+  let r;
+  try { r = await fetch(`https://api.github.com/repos/${encodeURIComponent(c.owner)}/${encodeURIComponent(c.repo)}`, {headers: ghHeaders(c.token), cache: 'no-store'}); }
+  catch { return err('No hay conexión a internet.'); }
+  if (r.status === 401) return err('El token no es válido. Copialo de nuevo.');
+  if (!r.ok) return err(`El token no tiene acceso a ${c.owner}/${c.repo}. Revisá los pasos 3 y 4.`);
+  err('');
+  syncCfg = c; localStorage.setItem(SYNC_KEY, JSON.stringify(c));
+  $('#syncToken').value = '';
+  renderSettings(); render();
+  await sync();
+  renderSettings();
+};
+$('#syncNow').onclick = () => sync();
+$('#syncDisconnect').onclick = () => {
+  if (!confirm('¿Desconectar este dispositivo? Los datos quedan acá y en GitHub, pero dejan de sincronizarse.')) return;
+  syncCfg = null; localStorage.removeItem(SYNC_KEY); setSync('ok'); renderSettings(); render();
+};
+
+$('#exportBtn').onclick = () => {
+  const blob = new Blob([JSON.stringify(S, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = `mi-plata-${today()}.json`; a.click();
+  URL.revokeObjectURL(a.href);
+};
+$('#importBtn').onclick = () => $('#importFile').click();
+$('#importFile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    if (!Array.isArray(data.entries) || !Array.isArray(data.rates)) throw 0;
+    if (!confirm('Se van a sumar los datos del archivo a los que ya tenés. ¿Seguir?')) return;
+    S = merge(S, migrate(data)); save(); renderSettings(); render();
+  } catch { alert('El archivo no es una copia válida de Mi Plata.'); }
+  e.target.value = '';
+};
+$('#resetBtn').onclick = () => {
+  if (!(confirm('¿Borrar TODOS los datos' + (syncCfg ? ' (también en tus otros dispositivos)' : '') + '? No se puede deshacer.')
+        && confirm('¿Seguro? Te conviene exportar una copia antes.'))) return;
+  const t = now(), o = {};
+  for (const d of Object.keys(S.overrides)) o[d] = {v:null, t};
+  S = { v:2,
+    entries: S.entries.map(x => ({id: x.id, del:true, t})),
+    rates: S.rates.map(r => ({from: r.from, del:true, t})),
+    overrides: o, workdays: {v: DEF_WD.slice(), t}, initial: {v:0, t} };
+  save(); renderSettings(); render();
+};
+
+/* ---------- inicio ---------- */
+$('#date').value = today();
+renderCats();
+render();
+setSync('busy');
+if (syncCfg) sync(); else $('#syncPill').hidden = true;
+if (!sortedRates().length) { renderSettings(); dlg.showModal(); }
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
